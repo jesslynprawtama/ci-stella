@@ -1,0 +1,67 @@
+/* Print-specific styles for PDF generation */
+@media print {
+  @page {
+    margin: 10mm;
+    size: A4;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Prevent page breaks inside these elements */
+  [data-report-content] h1,
+  [data-report-content] h2,
+  [data-report-content] h3,
+  [data-report-content] h4,
+  [data-report-content] .border-l-4,
+  [data-report-content] .bg-yellow-50,
+  [data-report-content] .bg-green-50,
+  [data-report-content] .bg-green-100,
+  [data-report-content] .bg-blue-50 {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Keep content blocks together */
+  [data-report-content] > div {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Avoid breaking after headings */
+  [data-report-content] h3,
+  [data-report-content] h4 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* Ensure proper spacing between sections */
+  [data-report-content] {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
+/* General styles to prevent content splitting */
+[data-report-content] .border-l-4 {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+[data-report-content] .bg-yellow-50 {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+[data-report-content] .bg-green-50,
+[data-report-content] .bg-green-100 {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+[data-report-content] .bg-blue-50 {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}

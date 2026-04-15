@@ -959,7 +959,8 @@ export function MonthlyReport() {
   };
 
   /**
-   * Renders a comparison bar showing previous month vs current month progress
+   * Renders a single stacked comparison bar showing previous month vs current month progress
+   * with different colors for each month segment
    */
   const ComparisonProgressBar = ({ task }: { task: Task }) => {
     const currentMonthKey = getCurrentMonthKey();
@@ -1007,57 +1008,68 @@ export function MonthlyReport() {
     
     return (
       <div className="space-y-2">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Previous Month Bar */}
-          <div>
-            <div className="text-xs font-medium text-gray-600 mb-1">
-              {prevMonthName}: {prevPercentage}%
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-5">
+        {/* Single Stacked Comparison Bar */}
+        <div>
+          <div className="text-xs font-medium text-gray-600 mb-1">
+            Month-over-Month Progress
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-7 relative overflow-hidden flex items-center">
+            {/* Previous Month Segment */}
+            {prevPercentage > 0 && (
               <div
-                className="h-5 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
+                className="h-full transition-all"
                 style={{
                   width: `${prevPercentage}%`,
                   backgroundColor: getProgressColor(prevMonthName),
                 }}
-                title={prevProgress ? `${prevProgress.completed}/${prevProgress.total}` : 'No data'}
-              >
-                {prevPercentage > 15 && `${prevPercentage}%`}
-              </div>
-            </div>
-            {prevProgress && (
-              <div className="text-xs text-gray-600 mt-0.5">
-                {prevProgress.completed.toLocaleString()} / {prevProgress.total.toLocaleString()}
-              </div>
+                title={prevProgress ? `${prevMonthName}: ${prevProgress.completed}/${prevProgress.total}` : 'No data'}
+              />
             )}
-          </div>
-
-          {/* Current Month Bar */}
-          <div>
-            <div className="text-xs font-medium text-gray-600 mb-1">
-              {currentMonthName}: {currentPercentage}%
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-5">
+            
+            {/* Current Month Segment (incremental progress) */}
+            {difference > 0 && (
               <div
-                className="h-5 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
+                className="h-full transition-all"
+                style={{
+                  width: `${difference}%`,
+                  backgroundColor: getProgressColor(currentMonthName),
+                }}
+                title={`${currentMonthName}: ${currentProgress.completed}/${currentProgress.total}`}
+              />
+            )}
+
+            {/* Fallback if no previous month data */}
+            {prevPercentage === 0 && (
+              <div
+                className="h-full"
                 style={{
                   width: `${currentPercentage}%`,
                   backgroundColor: getProgressColor(currentMonthName),
                 }}
-                title={`${currentProgress.completed}/${currentProgress.total}`}
-              >
-                {currentPercentage > 15 && `${currentPercentage}%`}
-              </div>
-            </div>
-            <div className="text-xs text-gray-600 mt-0.5">
-              {currentProgress.completed.toLocaleString()} / {currentProgress.total.toLocaleString()}
-            </div>
+                title={`${currentMonthName}: ${currentProgress.completed}/${currentProgress.total}`}
+              />
+            )}
           </div>
         </div>
 
-        {/* Progress Change Indicator */}
-        <div className={`text-center text-sm font-bold p-2 rounded ${difference > 0 ? 'bg-green-100 text-green-700' : difference < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-          {difference > 0 ? '📈' : difference < 0 ? '📉' : '➡️'} Change: {differencePercentage}
+        {/* Legend */}
+        <div className="flex gap-4 text-xs mt-2">
+          {prevProgress && (
+            <div className="flex items-center gap-1.5">
+              <div 
+                className="w-2 h-2 rounded" 
+                style={{ backgroundColor: getProgressColor(prevMonthName) }}
+              />
+              <span className="font-medium">{prevMonthName}: {prevPercentage}% ({prevProgress.completed}/{prevProgress.total})</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <div 
+              className="w-2 h-2 rounded" 
+              style={{ backgroundColor: getProgressColor(currentMonthName) }}
+            />
+            <span className="font-medium">{currentMonthName}: {difference}% ({currentProgress.completed}/{currentProgress.total})</span>
+          </div>
         </div>
       </div>
     );
@@ -1394,49 +1406,9 @@ export function MonthlyReport() {
                         </div>
                       )}
                       
-                      {/* Mini progress bar showing monthly breakdown */}
                       {task.currentTotal !== undefined && task.currentTotal > 0 && (
-                        <div className="ml-6">
-                          <div className="w-full bg-gray-200 rounded-full h-3 relative overflow-hidden">
-                            {sortedEntries.length > 0 ? sortedEntries.map(([monthKey, progress], index) => {
-                              const previousPercentage = index > 0 ? sortedEntries[index - 1][1].percentage : 0;
-                              const width = progress.percentage - previousPercentage;
-                              const monthName = getMonthName(monthKey);
-                              const color = getProgressColor(monthName);
-                              if (width <= 0) return null;
-                              return (
-                                <div
-                                  key={monthKey}
-                                  className="absolute h-full"
-                                  style={{
-                                    left: `${previousPercentage}%`,
-                                    width: `${width}%`,
-                                    backgroundColor: color,
-                                  }}
-                                  title={`${format(new Date(monthKey + '-01'), 'MMM yyyy')}: ${progress.percentage}%`}
-                                />
-                              );
-                            }) : (
-                              <div 
-                                className="h-full rounded-full"
-                                style={{ width: `${task.progress}%`, backgroundColor: getProgressColor(month) }}
-                              />
-                            )}
-                          </div>
-                          {hasMultipleMonths && (
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                              {sortedEntries.map(([monthKey]) => {
-                                const monthName = getMonthName(monthKey);
-                                const color = getProgressColor(monthName);
-                                return (
-                                  <div key={monthKey} className="flex items-center gap-0.5">
-                                    <div className="size-2 rounded" style={{ backgroundColor: color }} />
-                                    <span className="text-[10px] text-gray-500">{format(new Date(monthKey + '-01'), 'MMM')}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                        <div className="text-xs text-gray-500 ml-5">
+                          {task.currentCompleted} / {task.currentTotal}
                         </div>
                       )}
                     </li>
@@ -1664,12 +1636,6 @@ export function MonthlyReport() {
                           <div className="bg-gray-100 p-3 rounded-lg">
                             <div className="text-xs font-bold text-gray-700 mb-2">📊 Month-over-Month Comparison:</div>
                             <ComparisonProgressBar task={task} />
-                          </div>
-                          
-                          {/* Multi-Month History Bar */}
-                          <div>
-                            <div className="text-xs font-medium text-gray-600 mb-1">📈 Full Progress History:</div>
-                            <MultiMonthProgressBar task={task} />
                           </div>
                         </div>
                       )}
@@ -2053,13 +2019,7 @@ export function MonthlyReport() {
               </div>
             </div>
             
-            {/* Progress Bar Preview showing monthly breakdown */}
-            {(task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) && (
-              <div className="mt-2">
-                <div className="text-xs font-medium text-gray-600 mb-1">Monthly Progress History:</div>
-                <MultiMonthProgressBar task={task} />
-              </div>
-            )}
+
             
             <textarea
               placeholder="Details and notes (press Enter for new lines)"

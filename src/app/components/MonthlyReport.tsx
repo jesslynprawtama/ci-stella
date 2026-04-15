@@ -374,11 +374,12 @@ export function MonthlyReport() {
     // Parse current month key
     const [curYear, curMonth] = currentMonthKey.split('-').map(Number);
     
-    // Scan backwards up to 12 months to find progress history
-    for (let i = 12; i >= 0; i--) {
+    // Scan forward through all 24 months (current + previous 23 months) to find progress history
+    for (let i = 23; i >= 0; i--) {
       let scanMonth = curMonth - i;
       let scanYear = curYear;
       
+      // Normalize month/year (handle year boundaries)
       while (scanMonth <= 0) {
         scanMonth += 12;
         scanYear -= 1;
@@ -391,29 +392,35 @@ export function MonthlyReport() {
       // Don't scan beyond the current report month
       if (scanMonthKey > currentMonthKey) continue;
       
+      // Skip if we've already found this month's data
+      if (allProgress[scanMonthKey]) continue;
+      
       const savedData = localStorage.getItem(storageKey);
       if (savedData) {
         try {
           const parsed: StoredData = JSON.parse(savedData);
-          // Search for matching task in in-progress tasks
+          // Search for matching task in in-progress tasks by exact name match
           const matchingTask = parsed.inProgressTasks.find(t => t.name === taskName);
-          if (matchingTask && matchingTask.monthlyProgress) {
-            // Merge this month's progress entry if it exists
-            if (matchingTask.monthlyProgress[scanMonthKey]) {
+          if (matchingTask) {
+            // First priority: check explicit monthlyProgress entries
+            if (matchingTask.monthlyProgress && matchingTask.monthlyProgress[scanMonthKey]) {
               allProgress[scanMonthKey] = matchingTask.monthlyProgress[scanMonthKey];
             }
-          }
-          // Also check if the task had currentCompleted/currentTotal saved for that month
-          // even without explicit monthlyProgress entry
-          if (matchingTask && !allProgress[scanMonthKey] && matchingTask.currentCompleted !== undefined && matchingTask.currentTotal !== undefined && matchingTask.currentTotal > 0) {
-            allProgress[scanMonthKey] = {
-              completed: matchingTask.currentCompleted,
-              total: matchingTask.currentTotal,
-              percentage: Math.round((matchingTask.currentCompleted / matchingTask.currentTotal) * 100),
-            };
+            // Second priority: use currentCompleted/currentTotal if available and not already added
+            else if (!allProgress[scanMonthKey] && matchingTask.currentCompleted !== undefined && matchingTask.currentTotal !== undefined && matchingTask.currentTotal > 0) {
+              const completed = parseInt(String(matchingTask.currentCompleted)) || 0;
+              const total = parseInt(String(matchingTask.currentTotal)) || 0;
+              if (total > 0) {
+                allProgress[scanMonthKey] = {
+                  completed: completed,
+                  total: total,
+                  percentage: Math.round((completed / total) * 100),
+                };
+              }
+            }
           }
         } catch (e) {
-          // ignore parse errors
+          console.warn(`Error parsing data for ${scanMonthName} ${scanYear}:`, e);
         }
       }
     }
@@ -430,7 +437,22 @@ export function MonthlyReport() {
       try {
         const parsed: StoredData = JSON.parse(savedData);
         setCompletedTasks(parsed.completedTasks.sort((a, b) => (a.order || 0) - (b.order || 0)));
-        setInProgressTasks(parsed.inProgressTasks.sort((a, b) => (a.order || 0) - (b.order || 0)));
+        
+        // When loading in-progress tasks, also collect their monthly progress history from previous months
+        const inProgressWithHistory = parsed.inProgressTasks.map(task => {
+          const currentMonthKey = `${year}-${String(MONTH_NAMES.indexOf(month) + 1).padStart(2, '0')}`;
+          const collectedProgress = collectMonthlyProgressForTask(task.name, currentMonthKey);
+          
+          return {
+            ...task,
+            monthlyProgress: {
+              ...collectedProgress,
+              ...(task.monthlyProgress || {}), // preserve any existing monthlyProgress
+            },
+          };
+        });
+        
+        setInProgressTasks(inProgressWithHistory.sort((a, b) => (a.order || 0) - (b.order || 0)));
         setTotalVendors(parsed.totalVendors || '10308');
         setActiveVendors(parsed.activeVendors || (month === 'March' && year === '2026' ? '5076' : ''));
         setVendorsProcessed(parsed.vendorsProcessed || '');
@@ -446,24 +468,42 @@ export function MonthlyReport() {
   }, [month, year]);
 
   const initializeTemplateData = () => {
-    setCompletedTasks(
-      COMPLETED_TASKS_TEMPLATE.map((task, index) => ({
-        id: `completed-${index}`,
-        ...task,
-        progress: 100,
-        monthlyProgress: {},
-      }))
-    );
-    setInProgressTasks(
-      IN_PROGRESS_TASKS_TEMPLATE.map((task, index) => ({
+    const currentMonthKey = getCurrentMonthKey();
+    
+    // For in-progress tasks, collect their monthly progress history
+    const completedTasksWithData = COMPLETED_TASKS_TEMPLATE.map((task, index) => ({
+      id: `completed-${index}`,
+      ...task,
+      progress: 100,
+      monthlyProgress: {},
+    }));
+    
+    const inProgressTasksWithData = IN_PROGRESS_TASKS_TEMPLATE.map((task, index) => {
+      // Collect historical progress for this task from all previous months
+      const collectedProgress = collectMonthlyProgressForTask(task.name, currentMonthKey);
+      
+      // Also calculate current month progress if available
+      if (task.currentTotal && task.currentTotal > 0 && !collectedProgress[currentMonthKey]) {
+        collectedProgress[currentMonthKey] = {
+          completed: task.currentCompleted || 0,
+          total: task.currentTotal,
+          percentage: Math.round((((task.currentCompleted || 0) / task.currentTotal) || 0) * 100),
+        };
+      }
+      
+      return {
         id: `progress-${index}`,
         ...task,
         progress: task.currentTotal && task.currentTotal > 0 
           ? Math.round((task.currentCompleted! / task.currentTotal) * 100) 
           : 0,
-        monthlyProgress: {},
-      }))
-    );
+        monthlyProgress: collectedProgress,
+      };
+    });
+    
+    setCompletedTasks(completedTasksWithData);
+    setInProgressTasks(inProgressTasksWithData);
+    
     // Set March 2026 defaults
     if (month === 'March' && year === '2026') {
       setActiveVendors('5076');
@@ -493,9 +533,32 @@ export function MonthlyReport() {
     setIsSaving(true);
     
     const storageKey = getStorageKey(month, year);
+    
+    // Ensure all in-progress tasks have their monthly progress properly recorded
+    const tasksWithMonthlyProgress = inProgressTasks.map(task => {
+      const currentMonthKey = getCurrentMonthKey();
+      
+      // Ensure current month progress is in monthlyProgress
+      if (task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) {
+        return {
+          ...task,
+          monthlyProgress: {
+            ...(task.monthlyProgress || {}),
+            [currentMonthKey]: {
+              completed: task.currentCompleted,
+              total: task.currentTotal,
+              percentage: Math.round((task.currentCompleted / task.currentTotal) * 100),
+            },
+          },
+        };
+      }
+      
+      return task;
+    });
+    
     const dataToSave: StoredData = {
       completedTasks,
-      inProgressTasks,
+      inProgressTasks: tasksWithMonthlyProgress,
       totalVendors,
       activeVendors,
       vendorsProcessed,
@@ -503,6 +566,9 @@ export function MonthlyReport() {
     };
     
     localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    
+    // Also update the in-memory state to reflect saved data
+    setInProgressTasks(tasksWithMonthlyProgress);
     
     setTimeout(() => {
       setIsSaving(false);
@@ -893,6 +959,111 @@ export function MonthlyReport() {
   };
 
   /**
+   * Renders a comparison bar showing previous month vs current month progress
+   */
+  const ComparisonProgressBar = ({ task }: { task: Task }) => {
+    const currentMonthKey = getCurrentMonthKey();
+    const [curYear, curMonth] = currentMonthKey.split('-').map(Number);
+    
+    // Get previous month key
+    let prevMonth = curMonth - 1;
+    let prevYear = curYear;
+    if (prevMonth < 0) {
+      prevMonth = 12;
+      prevYear -= 1;
+    }
+    const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const prevMonthName = MONTH_NAMES[prevMonth - 1];
+    const currentMonthName = MONTH_NAMES[curMonth - 1];
+    
+    // Collect all progress for this task
+    const historicalProgress = collectMonthlyProgressForTask(task.name, currentMonthKey);
+    const mergedProgress: Record<string, MonthlyProgress> = { ...historicalProgress };
+    if (task.monthlyProgress) {
+      for (const [key, val] of Object.entries(task.monthlyProgress)) {
+        mergedProgress[key] = val;
+      }
+    }
+    
+    // Get current month progress
+    let currentProgress = mergedProgress[currentMonthKey];
+    if (!currentProgress && task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) {
+      currentProgress = {
+        completed: task.currentCompleted,
+        total: task.currentTotal,
+        percentage: Math.round((task.currentCompleted / task.currentTotal) * 100),
+      };
+    }
+    
+    // Get previous month progress
+    const prevProgress = mergedProgress[prevMonthKey];
+    
+    if (!currentProgress) return null;
+    
+    const prevPercentage = prevProgress?.percentage || 0;
+    const currentPercentage = currentProgress.percentage;
+    const difference = currentPercentage - prevPercentage;
+    const differencePercentage = difference >= 0 ? `+${difference}%` : `${difference}%`;
+    
+    return (
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-4">
+          {/* Previous Month Bar */}
+          <div>
+            <div className="text-xs font-medium text-gray-600 mb-1">
+              {prevMonthName}: {prevPercentage}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-5">
+              <div
+                className="h-5 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
+                style={{
+                  width: `${prevPercentage}%`,
+                  backgroundColor: getProgressColor(prevMonthName),
+                }}
+                title={prevProgress ? `${prevProgress.completed}/${prevProgress.total}` : 'No data'}
+              >
+                {prevPercentage > 15 && `${prevPercentage}%`}
+              </div>
+            </div>
+            {prevProgress && (
+              <div className="text-xs text-gray-600 mt-0.5">
+                {prevProgress.completed.toLocaleString()} / {prevProgress.total.toLocaleString()}
+              </div>
+            )}
+          </div>
+
+          {/* Current Month Bar */}
+          <div>
+            <div className="text-xs font-medium text-gray-600 mb-1">
+              {currentMonthName}: {currentPercentage}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-5">
+              <div
+                className="h-5 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
+                style={{
+                  width: `${currentPercentage}%`,
+                  backgroundColor: getProgressColor(currentMonthName),
+                }}
+                title={`${currentProgress.completed}/${currentProgress.total}`}
+              >
+                {currentPercentage > 15 && `${currentPercentage}%`}
+              </div>
+            </div>
+            <div className="text-xs text-gray-600 mt-0.5">
+              {currentProgress.completed.toLocaleString()} / {currentProgress.total.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Change Indicator */}
+        <div className={`text-center text-sm font-bold p-2 rounded ${difference > 0 ? 'bg-green-100 text-green-700' : difference < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+          {difference > 0 ? '📈' : difference < 0 ? '📉' : '➡️'} Change: {differencePercentage}
+        </div>
+      </div>
+    );
+  };
+
+  /**
    * Renders a multi-month progress bar for a task.
    * Collects progress from all saved months and displays each as a colored segment.
    */
@@ -1158,7 +1329,7 @@ export function MonthlyReport() {
                   const hasMultipleMonths = sortedEntries.length > 1;
 
                   return (
-                    <li key={task.id} className="space-y-1">
+                    <li key={task.id} className="space-y-1.5 p-2 bg-blue-50 rounded border border-blue-200">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2 flex-1">
                           <Clock className="size-4 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -1166,6 +1337,63 @@ export function MonthlyReport() {
                         </div>
                         <span className="text-xs font-bold text-blue-600">{task.progress}%</span>
                       </div>
+                      
+                      {/* Comparison Indicator */}
+                      {task.currentTotal !== undefined && task.currentTotal > 0 && (
+                        <div className="ml-5">
+                          {/* Get comparison data */}
+                          {(() => {
+                            const currentMonthKey = getCurrentMonthKey();
+                            const [curYear, curMonth] = currentMonthKey.split('-').map(Number);
+                            let prevMonth = curMonth - 1;
+                            let prevYear = curYear;
+                            if (prevMonth < 0) {
+                              prevMonth = 12;
+                              prevYear -= 1;
+                            }
+                            const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+                            const prevMonthName = MONTH_NAMES[prevMonth - 1];
+                            const currentMonthName = MONTH_NAMES[curMonth - 1];
+                            
+                            const historicalProgress = collectMonthlyProgressForTask(task.name, currentMonthKey);
+                            const mergedProgress: Record<string, MonthlyProgress> = { ...historicalProgress };
+                            if (task.monthlyProgress) {
+                              for (const [key, val] of Object.entries(task.monthlyProgress)) {
+                                mergedProgress[key] = val;
+                              }
+                            }
+                            
+                            let currentProgress = mergedProgress[currentMonthKey];
+                            if (!currentProgress && task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) {
+                              currentProgress = {
+                                completed: task.currentCompleted,
+                                total: task.currentTotal,
+                                percentage: Math.round((task.currentCompleted / task.currentTotal) * 100),
+                              };
+                            }
+                            
+                            const prevProgress = mergedProgress[prevMonthKey];
+                            const prevPercentage = prevProgress?.percentage || 0;
+                            const currentPercentage = currentProgress?.percentage || 0;
+                            const diff = currentPercentage - prevPercentage;
+                            const diffSign = diff > 0 ? '+' : '';
+                            
+                            return (
+                              <div className="text-xs space-y-0.5">
+                                <div className="flex gap-2 justify-between font-medium text-gray-700">
+                                  <span>{prevMonthName}: {prevPercentage}%</span>
+                                  <span>→</span>
+                                  <span>{currentMonthName}: {currentPercentage}%</span>
+                                </div>
+                                <div className={`text-center py-0.5 rounded text-xs font-bold ${diff > 0 ? 'bg-green-100 text-green-700' : diff < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {diff > 0 ? '📈' : diff < 0 ? '📉' : '➡️'} {diffSign}{diff}%
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                      
                       {/* Mini progress bar showing monthly breakdown */}
                       {task.currentTotal !== undefined && task.currentTotal > 0 && (
                         <div className="ml-6">
@@ -1427,12 +1655,22 @@ export function MonthlyReport() {
                       </div>
                       
                       {(task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) && (
-                        <div className="mb-3">
-                          <div className="text-xs font-medium text-gray-600 mb-2">
+                        <div className="mb-4 space-y-3">
+                          <div className="text-xs font-medium text-gray-600">
                             Current Progress: {task.currentCompleted} / {task.currentTotal} ({task.progress}%)
                           </div>
-                          {/* Use the new MultiMonthProgressBar component */}
-                          <MultiMonthProgressBar task={task} />
+                          
+                          {/* Comparison Bar: Previous vs Current Month */}
+                          <div className="bg-gray-100 p-3 rounded-lg">
+                            <div className="text-xs font-bold text-gray-700 mb-2">📊 Month-over-Month Comparison:</div>
+                            <ComparisonProgressBar task={task} />
+                          </div>
+                          
+                          {/* Multi-Month History Bar */}
+                          <div>
+                            <div className="text-xs font-medium text-gray-600 mb-1">📈 Full Progress History:</div>
+                            <MultiMonthProgressBar task={task} />
+                          </div>
                         </div>
                       )}
                       
@@ -1814,6 +2052,14 @@ export function MonthlyReport() {
                 />
               </div>
             </div>
+            
+            {/* Progress Bar Preview showing monthly breakdown */}
+            {(task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0) && (
+              <div className="mt-2">
+                <div className="text-xs font-medium text-gray-600 mb-1">Monthly Progress History:</div>
+                <MultiMonthProgressBar task={task} />
+              </div>
+            )}
             
             <textarea
               placeholder="Details and notes (press Enter for new lines)"

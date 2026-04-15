@@ -19,6 +19,7 @@ export default function App() {
               Comprehensive monthly progress tracking for vendor database cleanup, standardization, and synchronization activities
             </p>
           </div>
+          
           {/* Main Report Component */}
           <div className="bg-white rounded-xl shadow-lg p-8">
             <MonthlyReport />

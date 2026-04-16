@@ -1278,23 +1278,6 @@ export function MonthlyReport() {
             )}
           </div>
 
-          {previousMonthData && (
-            <div className="mb-6 p-3 bg-gray-50 border border-gray-300 rounded-lg">
-              <div className="text-xs font-semibold text-gray-700 mb-1">📊 Previous Month Reference ({previousMonthData.monthName} {previousMonthData.year}):</div>
-              <div className="text-xs text-gray-600 flex gap-4">
-                {previousMonthData.totalVendors && (
-                  <span>Total Vendors: <strong>{parseInt(previousMonthData.totalVendors).toLocaleString()}</strong></span>
-                )}
-                {previousMonthData.activeVendors && (
-                  <span>Active Vendors: <strong>{parseInt(previousMonthData.activeVendors).toLocaleString()}</strong></span>
-                )}
-                {previousMonthData.inactiveVendors && (
-                  <span>Inactive Vendors: <strong>{parseInt(previousMonthData.inactiveVendors).toLocaleString()}</strong></span>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-bold mb-3 text-green-700 border-b border-green-200 pb-1">
@@ -1535,23 +1518,6 @@ export function MonthlyReport() {
               />
             )}
           </div>
-
-          {previousMonthData && (
-            <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg" style={{ pageBreakInside: 'avoid' }}>
-              <div className="text-sm font-semibold text-gray-700 mb-2">📊 Previous Month Reference ({previousMonthData.monthName} {previousMonthData.year}):</div>
-              <div className="text-sm text-gray-600 flex gap-6">
-                {previousMonthData.totalVendors && (
-                  <span>Total Vendors: <strong>{parseInt(previousMonthData.totalVendors).toLocaleString()}</strong></span>
-                )}
-                {previousMonthData.activeVendors && (
-                  <span>Active Vendors: <strong>{parseInt(previousMonthData.activeVendors).toLocaleString()}</strong></span>
-                )}
-                {previousMonthData.inactiveVendors && (
-                  <span>Inactive Vendors: <strong>{parseInt(previousMonthData.inactiveVendors).toLocaleString()}</strong></span>
-                )}
-              </div>
-            </div>
-          )}
 
           <div>
             <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2 border-b-2 border-green-200 pb-2" style={{ pageBreakAfter: 'avoid' }}>

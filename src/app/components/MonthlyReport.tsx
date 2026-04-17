@@ -1287,9 +1287,9 @@ export function MonthlyReport() {
                 {completedTasks
                   .sort((a, b) => (b.showHighlight ? 1 : 0) - (a.showHighlight ? 1 : 0))
                   .map(task => (
-                    <li key={task.id} className="flex items-start gap-2">
+                    <li key={task.id} className="flex items-center gap-2">
                       <Check className="size-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div>
+                      <div style={{ lineHeight: '2.0' }}>
                         <span className="font-medium">{task.name}</span>
                         {task.showHighlight && <span className="ml-2 text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">NEW</span>}
                       </div>

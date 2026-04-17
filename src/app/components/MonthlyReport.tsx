@@ -467,6 +467,11 @@ export function MonthlyReport() {
     }
   }, [month, year]);
 
+  // Notify App.tsx when month/year changes
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('monthYearChanged', { detail: { month, year, totalVendors } }));
+  }, [month, year, totalVendors]);
+
   const initializeTemplateData = () => {
     const currentMonthKey = getCurrentMonthKey();
     

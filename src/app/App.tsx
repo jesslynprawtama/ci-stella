@@ -11,18 +11,14 @@ const MONTH_NAMES = [
 export default function App() {
   const [totalVendors, setTotalVendors] = useState('10,308');
 
-  // Get storage key for current month/year
-  const getStorageKey = () => {
-    const currentMonth = format(new Date(), 'MMMM');
-    const currentYear = new Date().getFullYear().toString();
-    const monthIndex = MONTH_NAMES.indexOf(currentMonth);
-    return `vendor-report-data-${currentYear}-${String(monthIndex + 1).padStart(2, '0')}`;
-  };
-
   // Load total vendors from localStorage on mount
   useEffect(() => {
-    const loadTotalVendors = () => {
-      const storageKey = getStorageKey();
+    const loadTotalVendors = (m?: string, y?: string) => {
+      const monthToUse = m || format(new Date(), 'MMMM');
+      const yearToUse = y || new Date().getFullYear().toString();
+      const monthIndex = MONTH_NAMES.indexOf(monthToUse);
+      const storageKey = `vendor-report-data-${yearToUse}-${String(monthIndex + 1).padStart(2, '0')}`;
+      
       const savedData = localStorage.getItem(storageKey);
       if (savedData) {
         try {
@@ -38,8 +34,14 @@ export default function App() {
 
     loadTotalVendors();
 
-    // Listen for custom event from MonthlyReport component
-    const handleVendorDataSaved = (event: CustomEvent) => {
+    // Listen for custom event when month/year changes in MonthlyReport
+    const handleMonthYearChanged = (event: CustomEvent) => {
+      const { month, year } = event.detail;
+      loadTotalVendors(month, year);
+    };
+
+    // Listen for custom event when vendor data is saved
+    const handleVendorDataSaved = () => {
       loadTotalVendors();
     };
 
@@ -48,10 +50,12 @@ export default function App() {
       loadTotalVendors();
     };
 
+    window.addEventListener('monthYearChanged', handleMonthYearChanged as EventListener);
     window.addEventListener('vendorDataSaved', handleVendorDataSaved as EventListener);
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
+      window.removeEventListener('monthYearChanged', handleMonthYearChanged as EventListener);
       window.removeEventListener('vendorDataSaved', handleVendorDataSaved as EventListener);
       window.removeEventListener('storage', handleStorageChange);
     };

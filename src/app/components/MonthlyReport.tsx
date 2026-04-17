@@ -567,6 +567,9 @@ export function MonthlyReport() {
     
     localStorage.setItem(storageKey, JSON.stringify(dataToSave));
     
+    // Dispatch custom event to notify other components (like App.tsx) about the data change
+    window.dispatchEvent(new CustomEvent('vendorDataSaved', { detail: { totalVendors } }));
+    
     // Also update the in-memory state to reflect saved data
     setInProgressTasks(tasksWithMonthlyProgress);
     
@@ -1330,7 +1333,11 @@ export function MonthlyReport() {
                           <Clock className="size-4 text-blue-600 mt-0.5 flex-shrink-0" />
                           <span className="font-medium">{task.name}</span>
                         </div>
-                        <span className="text-xs font-bold text-blue-600">{task.progress}%</span>
+                        {task.currentTotal !== undefined && task.currentTotal > 0 && (
+                          <span className="text-xs font-bold text-blue-600">
+                            {task.currentCompleted} / {task.currentTotal}
+                          </span>
+                        )}
                       </div>
                       
                       {/* Comparison Indicator */}
@@ -1388,12 +1395,6 @@ export function MonthlyReport() {
                           })()}
                         </div>
                       )}
-                      
-                      {task.currentTotal !== undefined && task.currentTotal > 0 && (
-                        <div className="text-xs text-gray-500 ml-5">
-                          {task.currentCompleted} / {task.currentTotal}
-                        </div>
-                      )}
                     </li>
                   );
                 })}
@@ -1409,7 +1410,7 @@ export function MonthlyReport() {
           )}
 
           <div className="mt-6 pt-4 border-t border-gray-300 text-xs text-gray-600">
-            <p className="mb-1"><strong>Project Context:</strong> Managing 10,308 vendors in database (established since 2017)</p>
+            <p className="mb-1"><strong>Project Context:</strong> Managing {parseInt(totalVendors).toLocaleString()} vendors in database (established since 2017)</p>
             <p><strong>Generated:</strong> {format(new Date(), 'MMMM dd, yyyy')}</p>
           </div>
         </div>
@@ -1633,7 +1634,7 @@ export function MonthlyReport() {
           )}
 
           <div className="border-t-2 border-gray-300 pt-4 text-sm text-gray-600 bg-gray-50 p-4 rounded" style={{ pageBreakInside: 'avoid' }}>
-            <p className="mb-2"><strong>Project Context:</strong> Managing 10,308 vendors in database (established since 2017)</p>
+            <p className="mb-2"><strong>Project Context:</strong> Managing {parseInt(totalVendors).toLocaleString()} vendors in database (established since 2017)</p>
             <p><strong>Timeline:</strong> Standardization rules created from mid-2025 until now, work still in progress. Ongoing cleanup and synchronization between MJS and WSI databases</p>
           </div>
         </div>

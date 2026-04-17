@@ -1,7 +1,61 @@
 import { FileText } from 'lucide-react';
 import { MonthlyReport } from './components/MonthlyReport';
+import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 export default function App() {
+  const [totalVendors, setTotalVendors] = useState('10,308');
+
+  // Get storage key for current month/year
+  const getStorageKey = () => {
+    const currentMonth = format(new Date(), 'MMMM');
+    const currentYear = new Date().getFullYear().toString();
+    const monthIndex = MONTH_NAMES.indexOf(currentMonth);
+    return `vendor-report-data-${currentYear}-${String(monthIndex + 1).padStart(2, '0')}`;
+  };
+
+  // Load total vendors from localStorage on mount
+  useEffect(() => {
+    const loadTotalVendors = () => {
+      const storageKey = getStorageKey();
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed.totalVendors) {
+            setTotalVendors(parseInt(parsed.totalVendors).toLocaleString());
+          }
+        } catch (e) {
+          console.error('Error loading total vendors:', e);
+        }
+      }
+    };
+
+    loadTotalVendors();
+
+    // Listen for custom event from MonthlyReport component
+    const handleVendorDataSaved = (event: CustomEvent) => {
+      loadTotalVendors();
+    };
+
+    // Listen for storage changes from other tabs/windows
+    const handleStorageChange = () => {
+      loadTotalVendors();
+    };
+
+    window.addEventListener('vendorDataSaved', handleVendorDataSaved as EventListener);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('vendorDataSaved', handleVendorDataSaved as EventListener);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
@@ -30,7 +84,7 @@ export default function App() {
             <h3 className="font-bold text-blue-900 mb-3">📊 Project Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
               <div>
-                <p className="mb-2"><strong>Total Vendors:</strong> 10,308 records</p>
+                <p className="mb-2"><strong>Total Vendors:</strong> {totalVendors} records</p>
                 <p className="mb-2"><strong>Database History:</strong> Established since 2017</p>
                 <p><strong>Current Phase:</strong> Standardization and cleanup</p>
               </div>

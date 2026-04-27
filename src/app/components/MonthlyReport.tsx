@@ -1385,6 +1385,12 @@ export function MonthlyReport() {
                             const diff = currentPercentage - prevPercentage;
                             const diffSign = diff > 0 ? '+' : '';
                             
+                            // Calculate numeric difference in completed items
+                            const prevCompleted = prevProgress?.completed || 0;
+                            const currentCompleted = currentProgress?.completed || 0;
+                            const numericDiff = currentCompleted - prevCompleted;
+                            const numericDiffSign = numericDiff > 0 ? '+' : '';
+                            
                             return (
                               <div className="text-xs space-y-0.5">
                                 <div className="flex gap-2 justify-between font-medium text-gray-700">
@@ -1392,8 +1398,8 @@ export function MonthlyReport() {
                                   <span>→</span>
                                   <span>{currentMonthName}: {currentPercentage}%</span>
                                 </div>
-                                <div className={`text-center py-0.5 rounded text-xs font-bold ${diff > 0 ? 'bg-green-100 text-green-700' : diff < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                  {diff > 0 ? '📈' : diff < 0 ? '📉' : '➡️'} {diffSign}{diff}%
+                                <div className={`text-center py-0.5 rounded text-xs font-bold ${numericDiff > 0 ? 'bg-green-100 text-green-700' : numericDiff < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {numericDiff > 0 ? '📈' : numericDiff < 0 ? '📉' : '➡️'} {numericDiffSign}{numericDiff} from prev. month ({diffSign}{diff}%)
                                 </div>
                               </div>
                             );
@@ -1554,6 +1560,11 @@ export function MonthlyReport() {
                           {task.completedDate && (
                             <div className="text-xs font-medium text-green-700 mb-2">
                               ✓ Completed: {format(new Date(task.completedDate), 'MMMM dd, yyyy')}
+                            </div>
+                          )}
+                          {task.currentCompleted !== undefined && task.currentTotal !== undefined && task.currentTotal > 0 && (
+                            <div className="text-sm font-medium text-green-700 mb-2 bg-green-100 p-2 rounded border border-green-300">
+                              📊 Progress: {task.currentCompleted} / {task.currentTotal}
                             </div>
                           )}
                           {task.notes && (
@@ -1820,6 +1831,31 @@ export function MonthlyReport() {
                 onChange={(e) => updateTask('completed', task.id, 'completedDate', e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-2 text-sm font-medium">Completed Count (optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 1500"
+                  value={task.currentCompleted || ''}
+                  onChange={(e) => updateTask('completed', task.id, 'currentCompleted', e.target.value ? parseInt(e.target.value) : 0)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium">Total Count (optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 3000"
+                  value={task.currentTotal || ''}
+                  onChange={(e) => updateTask('completed', task.id, 'currentTotal', e.target.value ? parseInt(e.target.value) : 0)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
             </div>
             
             <textarea

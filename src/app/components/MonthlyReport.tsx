@@ -211,8 +211,8 @@ const IN_PROGRESS_TASKS_TEMPLATE = [
     category: 'Compliance',
     name: 'Following Up on Vendor Registration Forms',
     notes: 'Contacting buyers to follow up with vendors registered before 2021 who have not completed the vendor registration form (procedure implemented around 2021)',
-    currentCompleted: 3729,
-    currentTotal: 5076,
+    currentCompleted: 1441,
+    currentTotal: 2013,
     order: 7,
   },
   {

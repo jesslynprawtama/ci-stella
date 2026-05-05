@@ -1286,6 +1286,15 @@ export function MonthlyReport() {
             )}
           </div>
 
+          {/* New Vendors Information */}
+          {previousMonthData?.totalVendors && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-base font-semibold text-blue-700">
+                New Vendors on April 2026 : <span className="font-bold text-lg">{parseInt(totalVendors) - parseInt(previousMonthData.totalVendors)}</span> Vendors
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-bold mb-3 text-green-700 border-b border-green-200 pb-1">
